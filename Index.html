@@ -1,0 +1,613 @@
+<!DOCTYPE html>  
+<html lang="id">  
+<head>  
+<meta charset="UTF-8">  
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">  
+<title>Kitchen Rush Co-op</title>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>  
+<style>  
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }  
+  html, body {  
+    margin: 0; padding: 0; width: 100%; height: 100%;  
+    background: #181512; overflow: hidden;  
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;  
+    user-select: none; touch-action: none;  
+    position: fixed; top: 0; left: 0;  
+  }  
+  #app { position: relative; width: 100%; height: 100%; }  
+  .screen {  
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;  
+    display: flex; flex-direction: column; align-items: center; justify-content: center;  
+    color: #fff; text-align: center; padding: 20px;  
+    background: radial-gradient(circle at center, #2c221e 0%, #120e0c 100%);  
+  }  
+  .hidden { display: none !important; }  
+  h1 { font-size: clamp(28px, 6vw, 42px); margin-bottom: 8px; text-shadow: 0 4px 10px rgba(0,0,0,0.5); }  
+  h2 { font-size: clamp(14px, 3.2vw, 18px); font-weight: normal; color: #b8a69b; margin-top: 0; margin-bottom: 28px; }  
+  button {  
+    background: linear-gradient(135deg, #f06a35, #d64a13); color: #fff; border: none; border-radius: 14px;  
+    padding: 16px 32px; font-size: clamp(16px, 3.5vw, 20px); font-weight: bold; margin: 8px; cursor: pointer;  
+    min-width: 220px; touch-action: manipulation; box-shadow: 0 6px 16px rgba(214, 74, 19, 0.35);  
+    transition: transform 0.1s ease, box-shadow 0.1s ease;  
+  }  
+  button:active { transform: scale(0.96); box-shadow: 0 2px 8px rgba(214, 74, 19, 0.2); }  
+  button.secondary { background: linear-gradient(135deg, #4a423d, #2e2825); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }  
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }  
+  input[type=text] {  
+    padding: 14px; font-size: 22px; border-radius: 12px; border: 2px solid #5a4b42;  
+    text-align: center; text-transform: uppercase; width: 220px; margin: 8px;  
+    letter-spacing: 4px; background: #1f1815; color: #fff; outline: none;  
+  }  
+  #roomCodeDisplay {  
+    font-size: clamp(36px, 9vw, 52px); letter-spacing: 10px; font-weight: bold; color: #ff8c52;  
+    background: #1a1411; padding: 18px 36px; border-radius: 16px; margin: 20px 0;  
+    font-family: monospace; border: 2px dashed #f06a35;  
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);  
+  }  
+  #status { color: #b8a69b; font-size: 15px; margin-top: 14px; min-height: 22px; }  
+  #gameCanvasWrap { width: 100%; height: 100%; position: relative; touch-action: none; }  
+  canvas#game { display: block; background: #261f1a; width: 100%; height: 100%; touch-action: none; }  
+  #hud {  
+    position: absolute; top: 0; left: 0; width: 100%;  
+    display: flex; justify-content: space-between; padding: 12px 20px;  
+    box-sizing: border-box; color: #fff; font-size: clamp(18px, 3.5vw, 24px); font-weight: bold;  
+    text-shadow: 0 2px 8px rgba(0,0,0,0.9); pointer-events: none; z-index: 10;  
+  }  
+  #orderBar {  
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);  
+    background: rgba(20, 15, 12, 0.85); padding: 8px 20px; border-radius: 20px;  
+    color: #ffd166; font-size: clamp(13px, 2.8vw, 16px); pointer-events: none;  
+    z-index: 10; white-space: nowrap; border: 1px solid rgba(255,255,255,0.15);  
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);  
+  }  
+  #joystickZone {  
+    position: absolute; left: 24px; bottom: 30px; width: 130px; height: 130px;  
+    border-radius: 50%; background: rgba(255,255,255,0.08);  
+    touch-action: none; z-index: 20; border: 2px solid rgba(255,255,255,0.2);  
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);  
+  }  
+  #joystickThumb {  
+    position: absolute; left: 40px; top: 40px; width: 50px; height: 50px;  
+    border-radius: 50%; background: rgba(255,255,255,0.4); pointer-events: none;  
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);  
+  }  
+  #interactBtn {  
+    position: absolute; right: 28px; bottom: 35px; width: 95px; height: 95px;  
+    border-radius: 50%; background: linear-gradient(135deg, #f06a35, #d64a13); color: #fff;  
+    font-size: clamp(13px, 2.8vw, 16px); font-weight: bold;  
+    border: 3px solid rgba(255,255,255,0.5);  
+    display: flex; align-items: center; justify-content: center; text-align: center;  
+    z-index: 20; touch-action: manipulation; box-shadow: 0 6px 20px rgba(214,74,19,0.5);  
+  }  
+  #interactBtn:active { transform: scale(0.92); }  
+  #resultScore { font-size: clamp(52px, 12vw, 80px); font-weight: bold; color: #ff8c52; margin: 12px 0; text-shadow: 0 4px 12px rgba(0,0,0,0.5); }  
+  
+  @media (max-width: 480px) {  
+    #joystickZone { width: 110px; height: 110px; left: 16px; bottom: 20px; }  
+    #joystickThumb { width: 40px; height: 40px; left: 35px; top: 35px; }  
+    #interactBtn { width: 80px; height: 80px; right: 20px; bottom: 25px; }  
+  }  
+</style>  
+</head>  
+<body>  
+<div id="app">  
+  <div id="screen-menu" class="screen">  
+    <h1>🍳 Kitchen Rush</h1>  
+    <h2>Game Memasak Co-op 2 Pemain</h2>  
+    <button id="btnCreate">👑 Buat Room</button>  
+    <button id="btnShowJoin" class="secondary">🔗 Masuk Room</button>  
+    <div id="joinBox" class="hidden" style="margin-top:12px;">  
+      <input type="text" id="joinCodeInput" placeholder="Kode 5 Huruf" maxlength="5" autocomplete="off">  
+      <br>  
+      <button id="btnJoin" style="min-width:150px;">Hubungkan</button>  
+      <button id="btnCancelJoin" class="secondary" style="min-width:80px;">Batal</button>  
+    </div>  
+    <div id="status"></div>  
+  </div>  
+
+  <div id="screen-lobby" class="screen hidden">  
+    <h1>🏠 Room Dapur</h1>  
+    <div id="roomCodeDisplay">------</div>  
+    <h2>Bagikan kode ini ke teman Anda</h2>  
+    <div id="lobbyStatus" style="margin-bottom:20px; font-size:17px; color: #ffd166;">Menunggu Pemain 2...</div>  
+    <button id="btnReady" disabled style="min-width:160px;">Siap (Ready)</button>  
+    <button id="btnCancelLobby" class="secondary" style="min-width:110px; margin-top:12px;">Keluar</button>  
+  </div>  
+
+  <div id="screen-game" class="screen hidden" style="padding:0;">  
+    <div id="gameCanvasWrap">  
+      <canvas id="game"></canvas>  
+      <div id="hud">  
+        <span id="hudScore">⭐ 0</span>  
+        <span id="hudTimer">3:00</span>  
+      </div>  
+      <div id="orderBar">📋 Pesanan: Sayur Potong (Chopped Veggies)</div>  
+      <div id="joystickZone"><div id="joystickThumb"></div></div>  
+      <div id="interactBtn">✋<br>Ambil</div>  
+    </div>  
+  </div>  
+
+  <div id="screen-result" class="screen hidden">  
+    <h1 id="resultTitle">⏰ Waktu Habis!</h1>  
+    <div id="resultScore">0</div>  
+    <h2>pesanan berhasil disajikan bersama</h2>  
+    <button id="btnPlayAgain" style="min-width:160px;">🔄 Main Lagi</button>  
+    <button id="btnMenu" class="secondary" style="min-width:110px; margin-top:10px;">Menu Utama</button>  
+  </div>  
+</div>  
+
+<script>  
+(function(){  
+  const els = id => document.getElementById(id);  
+  const screens = ['menu','lobby','game','result'];  
+  function showScreen(name){  
+    screens.forEach(s => els('screen-'+s).classList.toggle('hidden', s !== name));  
+  }  
+  function makeRoomCode(len){  
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  
+    let out = '';  
+    for (let i=0;i<len;i++) out += chars[Math.floor(Math.random()*chars.length)];  
+    return out;  
+  }  
+  function getRandomInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }  
+
+  // NETWORKING CONFIGURATION  
+  const PEER_CONFIG = {  
+    debug: 0,  
+    config: {  
+      iceServers: [  
+        { urls: 'stun:stun.l.google.com:19302' },  
+        { urls: 'stun:stun1.l.google.com:19302' },  
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },  
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }  
+      ]  
+    }  
+  };  
+
+  let peer = null, conn = null, isHost = false, myRole = null, roomCode = null;  
+  let connectionAttempts = 0;  
+  const MAX_ATTEMPTS = 3;  
+
+  function setStatus(msg, isError = false){  
+    const el = els('status');  
+    if (el) { el.innerHTML = msg; el.style.color = isError ? '#ff6b6b' : '#b8a69b'; }  
+  }  
+
+  function setLobbyStatus(msg){  
+    const el = els('lobbyStatus');  
+    if (el) el.textContent = msg;  
+  }  
+
+  function destroyPeer(){  
+    if (peer) {  
+      try { if (conn) conn.close(); peer.destroy(); } catch(e){}  
+      peer = null; conn = null;  
+    }  
+  }  
+
+  // CREATE ROOM  
+  els('btnCreate').onclick = () => {  
+    els('btnCreate').disabled = true;  
+    els('btnShowJoin').disabled = true;  
+    setStatus('🔄 Menyiapkan room dapur...');  
+    connectionAttempts = 0;  
+    attemptCreateRoom();  
+  };  
+
+  function attemptCreateRoom(){  
+    destroyPeer();  
+    roomCode = makeRoomCode(5);  
+    isHost = true; myRole = 1;  
+    // FIX: peer ID must exactly match what the joining player connects to.
+    // Previously this included a Date.now() timestamp suffix, which the
+    // joining client never knew about, so peer.connect() always targeted
+    // a non-existent ID and the connection failed ("cannot login").
+    peer = new Peer('kitchenrush-' + roomCode, PEER_CONFIG);  
+    let settled = false;  
+
+    peer.on('open', () => {  
+      if (settled) return; settled = true;  
+      els('btnCreate').disabled = false; els('btnShowJoin').disabled = false;  
+      els('roomCodeDisplay').textContent = roomCode;  
+      showScreen('lobby');  
+      setLobbyStatus('📱 Menunggu pemain 2 bergabung...');  
+    });  
+
+    peer.on('connection', c => {  
+      conn = c; setupConnHandlers();  
+      setLobbyStatus('✅ Pemain 2 telah terhubung!');  
+      els('btnReady').disabled = false;  
+      conn.send({ t:'room', code: roomCode });  
+    });  
+
+    peer.on('error', (err) => {  
+      if (settled) return; settled = true; destroyPeer();  
+      els('btnCreate').disabled = false; els('btnShowJoin').disabled = false;  
+      // If the ID is already taken (e.g. a stale/duplicate room code),
+      // regenerating a fresh code and retrying resolves it automatically.
+      if (connectionAttempts < MAX_ATTEMPTS) {  
+        connectionAttempts++; setStatus(`🔄 Mencoba ulang (${connectionAttempts}/${MAX_ATTEMPTS})...`);  
+        setTimeout(attemptCreateRoom, 1000);  
+      } else { setStatus('❌ Gagal membuat room. Periksa koneksi internet Anda.', true); }  
+    });  
+  }  
+
+  // JOIN ROOM  
+  els('btnShowJoin').onclick = () => {  
+    els('joinBox').classList.toggle('hidden');  
+    if (!els('joinBox').classList.contains('hidden')) els('joinCodeInput').focus();  
+  };  
+  els('btnCancelJoin').onclick = () => { els('joinBox').classList.add('hidden'); setStatus(''); };  
+
+  els('btnJoin').onclick = () => {  
+    const code = els('joinCodeInput').value.trim().toUpperCase();  
+    if (!code || code.length < 5) { setStatus('⚠️ Masukkan 5 huruf kode room', true); return; }  
+    els('btnJoin').disabled = true; setStatus('🔄 Menghubungkan ke room...');  
+    connectionAttempts = 0; attemptJoinRoom(code);  
+  };  
+
+  function attemptJoinRoom(code){  
+    destroyPeer(); isHost = false; myRole = 2;  
+    peer = new Peer('client-' + Date.now() + '-' + getRandomInt(1000,9999), PEER_CONFIG);  
+    let settled = false;  
+
+    peer.on('open', () => {  
+      conn = peer.connect('kitchenrush-' + code, { reliable: true });  
+      conn.on('open', () => {  
+        if (settled) return; settled = true;  
+        setupConnHandlers();  
+        els('btnJoin').disabled = false; showScreen('lobby');  
+        els('roomCodeDisplay').textContent = code;  
+        setLobbyStatus('✅ Terhubung! Menunggu Host memulai...');  
+        els('btnReady').disabled = false;  
+        conn.send({ t:'join', role: 2 });  
+      });  
+      conn.on('error', () => {  
+        if (settled) return; settled = true; destroyPeer();  
+        els('btnJoin').disabled = false; setStatus('❌ Room tidak ditemukan.', true);  
+      });  
+    });  
+
+    peer.on('error', () => {  
+      if (settled) return; settled = true; destroyPeer();  
+      els('btnJoin').disabled = false; setStatus('❌ Gagal terhubung.', true);  
+    });  
+  }  
+
+  let readyStates = { 1:false, 2:false };  
+
+  function setupConnHandlers(){  
+    conn.on('data', handleData);  
+    conn.on('close', () => {  
+      if (!els('screen-game').classList.contains('hidden')) {  
+        alert('⚠️ Teman main terputus dari jaringan.'); location.reload();  
+      } else {  
+        setLobbyStatus('❌ Pemain lain keluar.'); els('btnReady').disabled = true;  
+      }  
+    });  
+  }  
+
+  function handleData(msg){  
+    if (msg.t === 'join' || msg.t === 'ready') {  
+      readyStates[msg.role || 2] = true;  
+      if (isHost) checkBothReady();  
+    } else if (msg.t === 'start') { startMatch(); }  
+    else if (msg.t === 'state') { remoteState = msg.s; }  
+    else if (msg.t === 'input') { remoteInput = msg.i; }  
+    else if (msg.t === 'end') { showResult(msg.score); }  
+  }  
+
+  els('btnReady').onclick = () => {  
+    readyStates[myRole] = true; els('btnReady').disabled = true; els('btnReady').textContent = '⏳ Siap!';  
+    if (isHost) { if (conn) conn.send({ t:'ready', role:1 }); checkBothReady(); }  
+    else { conn.send({ t:'ready', role:2 }); }  
+  };  
+
+  function checkBothReady(){ if (readyStates[1] && readyStates[2]) startMatch(); }  
+
+  els('btnCancelLobby').onclick = els('btnMenu').onclick = () => {  
+    destroyPeer(); showScreen('menu'); setStatus('');  
+    els('btnCreate').disabled = false; els('btnShowJoin').disabled = false;  
+  };  
+
+  // GAME CORE  
+  const canvas = els('game'), ctx = canvas.getContext('2d');  
+  let canvasReady = false;  
+
+  function resizeCanvas(){  
+    const container = els('gameCanvasWrap'); if (!container) return;  
+    const rect = container.getBoundingClientRect();  
+    canvas.width = rect.width || window.innerWidth;  
+    canvas.height = rect.height || window.innerHeight;  
+    canvasReady = true;  
+  }  
+  window.addEventListener('resize', resizeCanvas);  
+
+  const WORLD = { w: 800, h: 450 };  
+  const STATIONS = {  
+    crate:   { x: 100, y: 225, r: 38, label: '🥬 Sayur' },  
+    chop:    { x: 400, y: 110, r: 38, label: '🔪 Potong' },  
+    counter: { x: 700, y: 225, r: 38, label: '🍽️ Sajikan' }  
+  };  
+
+  let state = null, remoteState = null;  
+  let remoteInput = { dx:0, dy:0, interact:false }, localInput = { dx:0, dy:0, interact:false };  
+  let gameLoopHandle = null, renderLoopHandle = null, lastInteractTime = 0;  
+
+  function freshState(){  
+    return {  
+      players: { 1: { x: 260, y: 320, angle: 0, holding: null }, 2: { x: 540, y: 320, angle: 0, holding: null } },  
+      chopStation: { occupied:false, progress:0, done:false },  
+      score: 0, timeLeft: 180, matchOver: false  
+    };  
+  }  
+
+  function startMatch(){  
+    showScreen('game'); setTimeout(resizeCanvas, 100);  
+    if (isHost) {  
+      state = freshState();  
+      if (conn) conn.send({ t:'start' });  
+      if (gameLoopHandle) clearInterval(gameLoopHandle);  
+      gameLoopHandle = setInterval(hostTick, 50);  
+    }  
+    if (renderLoopHandle) cancelAnimationFrame(renderLoopHandle);  
+    renderLoop(); setupControls();  
+  }  
+
+  const SPEED = 175;  
+
+  function hostTick(){  
+    if (!state || state.matchOver) return;  
+    const dt = 0.05;  
+
+    moveAndCollide(1, localInput); moveAndCollide(2, remoteInput);  
+    handleInteract(1, localInput); handleInteract(2, remoteInput);  
+    localInput.interact = remoteInput.interact = false;  
+
+    if (state.chopStation.occupied && !state.chopStation.done) {  
+      state.chopStation.progress += dt;  
+      if (state.chopStation.progress >= 2.5) state.chopStation.done = true;  
+    }  
+
+    state.timeLeft -= dt;  
+    if (state.timeLeft <= 0) {  
+      state.timeLeft = 0; state.matchOver = true;  
+      if (conn) conn.send({ t:'end', score: state.score });  
+      endMatch(state.score);  
+    }  
+    if (conn && conn.open) conn.send({ t:'state', s: state });  
+  }  
+
+  function dist(ax,ay,bx,by){ return Math.hypot(ax-bx, ay-by); }  
+
+  function moveAndCollide(num, input){  
+    const p = state.players[num];  
+    const len = Math.hypot(input.dx, input.dy);  
+    let dx = input.dx, dy = input.dy;  
+    if (len > 1) { dx /= len; dy /= len; }  
+    if (len > 0.05) p.angle = Math.atan2(dy, dx);  
+    let nx = Math.max(26, Math.min(WORLD.w - 26, p.x + dx * SPEED * 0.05));  
+    let ny = Math.max(26, Math.min(WORLD.h - 26, p.y + dy * SPEED * 0.05));  
+    p.x = nx; p.y = ny;  
+  }  
+
+  function nearestStation(p){  
+    let best = null, bestD = 75;  
+    for (const key in STATIONS) {  
+      const d = dist(p.x, p.y, STATIONS[key].x, STATIONS[key].y);  
+      if (d < bestD) { bestD = d; best = key; }  
+    }  
+    return best;  
+  }  
+
+  function handleInteract(num, input){  
+    if (!input.interact) return;  
+    const p = state.players[num];  
+    const near = nearestStation(p);  
+
+    if (near === 'crate' && !p.holding) { p.holding = 'raw'; return; }  
+    if (near === 'chop') {  
+      if (p.holding === 'raw' && !state.chopStation.occupied) {  
+        state.chopStation.occupied = true; state.chopStation.progress = 0; state.chopStation.done = false;  
+        p.holding = null; return;  
+      }  
+      if (!p.holding && state.chopStation.occupied && state.chopStation.done) {  
+        p.holding = 'chopped'; state.chopStation.occupied = false; return;  
+      }  
+    }  
+    if (near === 'counter' && p.holding === 'chopped') { p.holding = null; state.score += 1; return; }  
+    if (p.holding && !near) p.holding = null;  
+  }  
+
+  function endMatch(score){  
+    if (gameLoopHandle) { clearInterval(gameLoopHandle); gameLoopHandle = null; }  
+    setTimeout(() => showResult(score), 500);  
+  }  
+
+  function showResult(score){  
+    showScreen('result');  
+    els('resultScore').textContent = score;  
+    els('resultTitle').textContent = score >= 8 ? '🎉 Kerja Sama Luar Biasa!' : "⏰ Waktu Habis!";  
+  }  
+
+  // RENDERING ENGINE  
+  function renderLoop(){  
+    const s = isHost ? state : remoteState;  
+    if (s && !els('screen-game').classList.contains('hidden')) {  
+      draw(s);  
+      els('hudScore').textContent = '⭐ ' + s.score;  
+      const t = Math.max(0, Math.ceil(s.timeLeft));  
+      els('hudTimer').textContent = Math.floor(t/60) + ':' + String(t%60).padStart(2,'0');  
+      updateInteractLabel(s);  
+      if (!isHost && s.matchOver) { showResult(s.score); return; }  
+    }  
+    renderLoopHandle = requestAnimationFrame(renderLoop);  
+  }  
+
+  function updateInteractLabel(s){  
+    const p = s.players[myRole]; if (!p) return;  
+    const near = nearestStation(p);  
+    let label = '...';  
+    if (near === 'crate') label = p.holding ? 'Buang' : 'Ambil 🥬';  
+    else if (near === 'chop') {  
+      if (p.holding === 'raw' && !s.chopStation.occupied) label = 'Potong 🔪';  
+      else if (!p.holding && s.chopStation.occupied && s.chopStation.done) label = 'Ambil ✅';  
+      else if (s.chopStation.occupied) label = '⏳...';  
+    } else if (near === 'counter') label = p.holding === 'chopped' ? 'Sajikan 🍽️' : '...';  
+    else label = p.holding ? 'Buang' : '...';  
+    els('interactBtn').innerHTML = label.replace(' ', '<br>');  
+  }  
+
+  function draw(s){  
+    if (!canvasReady || canvas.width === 0) return;  
+    ctx.clearRect(0,0,canvas.width,canvas.height);  
+    
+    const scale = Math.min(canvas.width / WORLD.w, canvas.height / WORLD.h);  
+    const offX = (canvas.width - WORLD.w * scale) / 2;  
+    const offY = (canvas.height - WORLD.h * scale) / 2;  
+
+    ctx.save();  
+    ctx.translate(offX, offY);  
+    ctx.scale(scale, scale);  
+
+    // Lantai Dapur  
+    ctx.fillStyle = '#3a2e28';  
+    ctx.fillRect(0,0,WORLD.w, WORLD.h);  
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;  
+    for (let i=0; i<WORLD.w; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, WORLD.h); ctx.stroke(); }  
+    for (let i=0; i<WORLD.h; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(WORLD.w, i); ctx.stroke(); }  
+
+    // Dinding  
+    ctx.strokeStyle = '#1a1411'; ctx.lineWidth = 8; ctx.strokeRect(0,0,WORLD.w,WORLD.h);  
+
+    // Station Dapur  
+    drawStation(STATIONS.crate, '#4e8a34', '🥬');  
+    drawStation(STATIONS.chop, '#9e733b', '🔪');  
+    drawStation(STATIONS.counter, '#3b6ea5', '🍽️');  
+
+    // Indikator Progres Potong  
+    if (s.chopStation.occupied) {  
+      const st = STATIONS.chop;  
+      const pct = Math.min(1, s.chopStation.progress / 2.5);  
+      ctx.fillStyle = s.chopStation.done ? '#72d154' : '#f0a835';  
+      ctx.fillRect(st.x - 30, st.y + 45, 60 * pct, 8);  
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;  
+      ctx.strokeRect(st.x - 30, st.y + 45, 60, 8);  
+    }  
+
+    // Karakter Koki  
+    drawPlayer(s.players[1], '#f06a35', 'P1 (Host)', myRole===1);  
+    drawPlayer(s.players[2], '#3598f0', 'P2', myRole===2);  
+
+    ctx.restore();  
+  }  
+
+  function drawStation(st, color, emoji){  
+    ctx.fillStyle = color; ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8;  
+    ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;  
+    ctx.fillStyle = '#fff'; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';  
+    ctx.fillText(emoji, st.x, st.y);  
+  }  
+
+  function drawPlayer(p, color, label, isMe){  
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 12;  
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, Math.PI*2); ctx.fill();  
+    ctx.shadowBlur = 0;  
+
+    if (isMe) {  
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;  
+      ctx.beginPath(); ctx.arc(p.x, p.y, 26, 0, Math.PI*2); ctx.stroke();  
+    }  
+
+    // Arah Koki  
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;  
+    ctx.beginPath(); ctx.moveTo(p.x, p.y);  
+    ctx.lineTo(p.x + Math.cos(p.angle)*28, p.y + Math.sin(p.angle)*28); ctx.stroke();  
+
+    // Label Pemain  
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';  
+    ctx.fillText(label, p.x, p.y - 32);  
+
+    // Makanan yang Dibawa  
+    if (p.holding) {  
+      ctx.fillStyle = p.holding === 'raw' ? '#72d154' : '#e3a857';  
+      ctx.beginPath(); ctx.arc(p.x, p.y - 38, 11, 0, Math.PI*2); ctx.fill();  
+      ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';  
+      ctx.fillText(p.holding === 'raw' ? '🥬' : '🥗', p.x, p.y - 38);  
+    }  
+  }  
+
+  // KONTROL  
+  let controlsBound = false;  
+  function setupControls(){  
+    if (controlsBound) return; controlsBound = true;  
+    const zone = els('joystickZone'), thumb = els('joystickThumb');  
+
+    function setJoy(dx,dy){  
+      localInput.dx = Math.max(-1, Math.min(1, dx));  
+      localInput.dy = Math.max(-1, Math.min(1, dy));  
+      if (!isHost && conn && conn.open) conn.send({ t:'input', i: { dx: localInput.dx, dy: localInput.dy, interact: false } });  
+    }  
+
+    function handleMove(clientX, clientY){  
+      const rect = zone.getBoundingClientRect();  
+      const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;  
+      let dx = clientX - cx, dy = clientY - cy;  
+      const maxR = rect.width/2, len = Math.hypot(dx,dy);  
+      if (len > maxR) { dx = dx/len*maxR; dy = dy/len*maxR; }  
+      thumb.style.left = (40 + dx * 25 / maxR) + 'px';  
+      thumb.style.top = (40 + dy * 25 / maxR) + 'px';  
+      setJoy(dx/maxR, dy/maxR);  
+    }  
+
+    function resetJoy(){ thumb.style.left = '40px'; thumb.style.top = '40px'; setJoy(0,0); }  
+
+    zone.addEventListener('touchstart', e => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});  
+    zone.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});  
+    zone.addEventListener('touchend', e => { e.preventDefault(); resetJoy(); }, {passive:false});  
+
+    // Tombol Akses (Interact)  
+    function fireInteract(){  
+      const now = Date.now(); if (now - lastInteractTime < 180) return;  
+      lastInteractTime = now; localInput.interact = true;  
+      if (!isHost && conn && conn.open) conn.send({ t:'input', i: { dx: localInput.dx, dy: localInput.dy, interact: true } });  
+    }  
+
+    els('interactBtn').addEventListener('touchstart', e => { e.preventDefault(); fireInteract(); }, {passive:false});  
+    els('interactBtn').addEventListener('mousedown', fireInteract);  
+
+    // Kontrol Keyboard Desktop  
+    const keys = {};  
+    window.addEventListener('keydown', e => {  
+      keys[e.key.toLowerCase()] = true;  
+      if (e.key === ' ' || e.key.toLowerCase() === 'e') { e.preventDefault(); fireInteract(); }  
+      updateKeyboard();  
+    });  
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; updateKeyboard(); });  
+
+    function updateKeyboard(){  
+      let dx=0, dy=0;  
+      if (keys['a'] || keys['arrowleft']) dx -= 1;  
+      if (keys['d'] || keys['arrowright']) dx += 1;  
+      if (keys['w'] || keys['arrowup']) dy -= 1;  
+      if (keys['s'] || keys['arrowdown']) dy += 1;  
+      setJoy(dx, dy);  
+    }  
+  }  
+
+  els('btnPlayAgain').onclick = () => {  
+    if (isHost) {  
+      state = freshState(); if (conn) conn.send({ t:'start' });  
+      if (gameLoopHandle) clearInterval(gameLoopHandle);  
+      gameLoopHandle = setInterval(hostTick, 50);  
+      showScreen('game');  
+    } else {  
+      showScreen('lobby'); setLobbyStatus('⏳ Menunggu host memulai ulang...');  
+    }  
+  };  
+
+  showScreen('menu'); resizeCanvas(); setStatus('');  
+})();  
+</script>  
+</body>  
+</html>
